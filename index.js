@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 
 app.use(express.json());
@@ -29,7 +29,9 @@ async function run() {
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
         const sliderCollection = client.db('eventDb').collection('slider');
-        const eventsCollection = client.db('eventDb').collection('events');
+        const eventCollection = client.db('eventDb').collection('events');
+        const blogCollection = client.db('eventDb').collection('blogs');
+        const orderCollection = client.db('eventDb').collection('orders');
 
         app.get('/slider', async (req, res) => {
             const cursor = sliderCollection.find();
@@ -38,9 +40,36 @@ async function run() {
         })
 
         app.get('/event', async (req, res) => {
-            const cursor = eventsCollection.find();
+            const cursor = eventCollection.find();
             const result = await cursor.toArray();
             res.send(result);
+        })
+
+        app.get('/event/:eventId', async (req, res) => {
+            const id = req.params.eventId;
+            const filter = { _id: new ObjectId(id) }
+            const result = await eventCollection.findOne(filter);
+            res.send(result);
+        })
+
+        app.get('/blog', async (req, res) => {
+            const cursor = blogCollection.find();
+            const result = await cursor.toArray();
+            res.send(result);
+        })
+
+        app.get('/blog/:blogId', async (req, res) => {
+            const id = req.params.blogId;
+            const filter = { _id: new ObjectId(id) }
+            const result = await blogCollection.findOne(filter);
+            res.send(result);
+        })
+
+
+        app.post('/order', async (req, res) => {
+            const bookingDetails = req.body;
+            const result = await orderCollection.insertOne(bookingDetails)
+            res.send(result)
         })
 
 
