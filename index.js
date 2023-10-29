@@ -1,11 +1,17 @@
 const express = require('express');
 const app = express();
+const jwt = require('jsonwebtoken');
 const cors = require('cors');
-require("dotenv").config();
+const cookieParser = require('cookie-parser')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
+require("dotenv").config();
+app.use(cors({
+    origin: ['http://localhost:5173', "http://127.0.0.1:5173"],
+    credentials: true
+}))
+app.use(cookieParser());
 app.use(express.json());
-app.use(cors());
 
 const uri = `mongodb+srv://${process.env.MONGODB_USER_NAME}:${process.env.MONGODB_USER_PASS}@cluster0.slh2c1n.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -34,6 +40,34 @@ async function run() {
 }
 run().catch(console.dir);
 
+const verify = async (req, res, next) => {
+    //check if the user is authenticated by checking the request if it has token then it will be verified
+    const token = req.cookies?.token;
+    if (!token) {
+        return res.status(401).send({ status: "Unauthorized", code: 401 });
+        // send({ status: "Unauthorized", code: 401 });
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decode) => {
+        if (error) {
+            return res.status(401).send({ status: "Unauthorized", code: 401 });
+        }
+        else {
+            // console.log(decode);
+            req.decode = decode;
+            next();
+        }
+
+    })
+}
+
+// jwt
+app.post('/jwt', async (req, res) => {
+    const userEmail = req.body;
+    //jwt.sign("payload","secretKey","ExpireInfo");
+    const token = jwt.sign(userEmail, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+    res.cookie("token", token, { httpOnly: true, secure: false, }).send({ message: "success", token })
+})
+
 // Database collections
 const sliderCollection = client.db('eventDb').collection('slider');
 const eventCollection = client.db('eventDb').collection('events');
@@ -54,8 +88,13 @@ app.get('/slider', async (req, res) => {
 // event related apis
 app.get('/event', async (req, res) => {
     try {
-        const cursor = eventCollection.find();
+        const query = {}
+        const option = {
+            projection: { _id: 1, name: 1, image: 1, short_description: 1, price: 1 }
+        }
+        const cursor = eventCollection.find(query, option);
         const result = await cursor.toArray();
+
         res.send(result);
     }
     catch (err) {
@@ -63,7 +102,8 @@ app.get('/event', async (req, res) => {
     }
 })
 
-app.get('/event/:eventId', async (req, res) => {
+app.get('/event/:eventId', verify, async (req, res) => {
+    console.log(req.decode);
     try {
         const id = req.params.eventId;
         const filter = { _id: new ObjectId(id) }
@@ -72,7 +112,7 @@ app.get('/event/:eventId', async (req, res) => {
     } catch (err) { console.log(err); }
 })
 
-app.post('/event', async (req, res) => {
+app.post('/event', verify, async (req, res) => {
     try {
         const newEvent = req.body;
         const result = await eventCollection.insertOne(newEvent);
@@ -84,6 +124,37 @@ app.post('/event', async (req, res) => {
     }
 })
 
+app.delete('/event/:eventId', verify, async (req, res) => {
+    try {
+        const filter = { _id: new ObjectId(req.params.eventId) }
+        const result = await eventCollection.deleteOne(filter);
+        res.send(result)
+    } catch (error) {
+        console.log(error);
+
+    }
+})
+
+app.put('/event/:eventId', verify, async (req, res) => {
+    try {
+        const event = req.body;
+        const updatedEvent = {
+            $set: {
+                ...event
+            }
+        }
+        const filter = { _id: new ObjectId(req.params.eventId) }
+        const options = { upsert: true }
+        // console.log(updatedEvent);
+        // res.send({ updatedEvent, filter })
+        const result = await eventCollection.updateOne(filter, updatedEvent, options);
+        res.send(result)
+    } catch (error) {
+        console.log(error);
+    }
+})
+
+
 //blog related apis
 
 app.get('/blog', async (req, res) => {
@@ -94,7 +165,7 @@ app.get('/blog', async (req, res) => {
     } catch (err) { console.log(err); }
 })
 
-app.get('/blog/:blogId', async (req, res) => {
+app.get('/blog/:blogId', verify, async (req, res) => {
     try {
         const id = req.params.blogId;
         const filter = { _id: new ObjectId(id) }
@@ -106,7 +177,7 @@ app.get('/blog/:blogId', async (req, res) => {
 })
 
 
-app.post('/order', async (req, res) => {
+app.post('/order', verify, async (req, res) => {
     try {
         const bookingDetails = req.body;
         const result = await orderCollection.insertOne(bookingDetails)
@@ -117,19 +188,11 @@ app.post('/order', async (req, res) => {
 })
 
 
-app.delete('/event/:eventId', async (req, res) => {
-    try {
-        const filter = { _id: new ObjectId(req.params.eventId) }
-        const result = await eventCollection.deleteOne(filter);
-        res.send(result)
-    } catch (error) {
-        console.log(error);
-    }
-})
 
 
 
-app.get('/', (req, res) => {
+
+app.get('/', verify, (req, res) => {
     res.send("Welcome to my events server!!")
 })
 
