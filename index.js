@@ -11,7 +11,7 @@ app.use(cors({
     credentials: true
 }))
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 const uri = `mongodb+srv://${process.env.MONGODB_USER_NAME}:${process.env.MONGODB_USER_PASS}@cluster0.slh2c1n.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -73,6 +73,7 @@ const sliderCollection = client.db('eventDb').collection('slider');
 const eventCollection = client.db('eventDb').collection('events');
 const blogCollection = client.db('eventDb').collection('blogs');
 const orderCollection = client.db('eventDb').collection('orders');
+const userCollection = client.db('eventDb').collection('users');
 
 // api for sliders
 app.get('/slider', async (req, res) => {
@@ -187,6 +188,43 @@ app.post('/order', verify, async (req, res) => {
     }
 })
 
+// #TODO: api for get the user
+app.get('/user', verify, async (req, res) => {
+    try {
+        // const user = 
+    } catch (error) {
+
+    }
+})
+
+app.post('/user', verify, async (req, res) => {
+    try {
+        const user = req.body;
+        const result = await userCollection.insertOne(user)
+        res.send(result)
+    } catch (error) {
+        res.status(500).send({ message: error.message })
+    }
+})
+
+app.patch('/user', verify, async (req, res) => {
+    try {
+        const user = req.body;
+        const { email } = user;
+        const query = { email };
+        const updatedUser = {
+            $set: {
+                ...user,
+            }
+        }
+        const result = await userCollection.updateOne(query, updatedUser)
+        // console.log(user);
+        // console.log(email);
+        res.send(result);
+    } catch (error) {
+        res.send({ error: error })
+    }
+})
 
 
 
