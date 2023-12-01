@@ -7,7 +7,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 require("dotenv").config();
 app.use(cors({
-    origin: ['http://localhost:5173', "http://127.0.0.1:5173"],
+    origin: ['http://localhost:5173'],
     credentials: true
 }))
 app.use(cookieParser());
@@ -65,7 +65,16 @@ app.post('/jwt', async (req, res) => {
     const userEmail = req.body;
     //jwt.sign("payload","secretKey","ExpireInfo");
     const token = jwt.sign(userEmail, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
-    res.cookie("token", token, { httpOnly: true, secure: false, }).send({ message: "success", token })
+    res.cookie("token", token, { httpOnly: true, sameSite: 'none', secure: true, }).send({ message: "success", token })
+})
+
+// clear cookies
+app.get('/clear', async (req, res) => {
+    res.clearCookie('token', {
+        maxAge: 0,
+        sameSite: 'none',
+        secure: true,
+    }).send({ message: "success" })
 })
 
 // Database collections
@@ -189,42 +198,52 @@ app.post('/order', verify, async (req, res) => {
 })
 
 // #TODO: api for get the user
-app.get('/user', verify, async (req, res) => {
+app.get('/user/:email', async (req, res) => {
     try {
-        // const user = 
+        const email = req.params.email;
+        const result = await userCollection.findOne({ email })
+        res.send(result);
     } catch (error) {
 
     }
 })
 
-app.post('/user', verify, async (req, res) => {
+app.patch('/user/:email', async (req, res) => {
     try {
+        const email = req.params.email;
         const user = req.body;
-        const result = await userCollection.insertOne(user)
+        const filter = { email };
+        const option = { upsert: true }
+        const updatedUser = {
+            $set: {
+                ...user,
+            }
+        }
+        const result = await userCollection.updateOne(filter, updatedUser, option)
         res.send(result)
     } catch (error) {
         res.status(500).send({ message: error.message })
     }
 })
 
-app.patch('/user', verify, async (req, res) => {
-    try {
-        const user = req.body;
-        const { email } = user;
-        const query = { email };
-        const updatedUser = {
-            $set: {
-                ...user,
-            }
-        }
-        const result = await userCollection.updateOne(query, updatedUser)
-        // console.log(user);
-        // console.log(email);
-        res.send(result);
-    } catch (error) {
-        res.send({ error: error })
-    }
-})
+// app.patch('/user', verify, async (req, res) => {
+//     try {
+//         const user = req.body;
+//         const { email } = user;
+//         const query = { email };
+//         const updatedUser = {
+//             $set: {
+//                 ...user,
+//             }
+//         }
+//         const result = await userCollection.updateOne(query, updatedUser)
+//         // console.log(user);
+//         // console.log(email);
+//         res.send(result);
+//     } catch (error) {
+//         res.send({ error: error })
+//     }
+// })
 
 
 
